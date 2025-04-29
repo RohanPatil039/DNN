@@ -1,0 +1,86 @@
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+import numpy as np
+
+class SimpleNN(nn.Module):
+    def __init__(self, activation_function='relu'):
+        super(SimpleNN, self).__init__()
+
+        if activation_function == 'relu':
+            self.activation = nn.ReLU()
+        elif activation_function == 'tanh':
+            self.activation = nn.Tanh()
+
+        self.layer1 = nn.Linear(2, 2)
+        self.output_layer = nn.Linear(2, 1)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        x = self.activation(self.layer1(x))
+        x = self.sigmoid(self.output_layer(x))
+        return x
+
+def train_model(model, X_train_tensor, y_train_tensor, lr, momentum):
+    criterion = nn.BCELoss()
+    optimizer = optim.SGD(model.parameters(), lr=lr, momentum=momentum)
+
+    for epoch in range(50):
+        model.train()
+        optimizer.zero_grad()
+        output = model(X_train_tensor)
+        loss = criterion(output, y_train_tensor)
+        loss.backward()
+        optimizer.step()
+
+    return model
+
+def optimize_hyperparameters(X_train_tensor, y_train_tensor):
+    best_accuracy = 0
+    best_params = {}
+
+    learning_rates = [0.01, 0.1]
+    momenta = [0.5, 0.9]
+    activations = ['relu', 'tanh']
+
+    for lr in learning_rates:
+        for momentum in momenta:
+            for activation in activations:
+                print(f"Training with lr={lr}, momentum={momentum}, activation={activation}")
+
+                model = SimpleNN(activation_function=activation)
+                trained_model = train_model(model, X_train_tensor, y_train_tensor, lr, momentum)
+
+                with torch.no_grad():
+                    model.eval()
+                    output = trained_model(X_train_tensor)
+                    predicted = (output > 0.5).float()
+                    accuracy = (predicted == y_train_tensor).float().mean()
+
+                print(f"Accuracy: {accuracy.item():.4f}")
+
+                if accuracy.item() > best_accuracy:
+                    best_accuracy = accuracy.item()
+                    best_params = {
+                        'learning_rate': lr,
+                        'momentum': momentum,
+                        'activation_function': activation
+                    }
+
+    return best_params, best_accuracy
+
+X = np.array([[0, 0], [0, 1], [1, 0], [1, 1]])
+y = np.array([[0], [0], [0], [1]])
+
+X_train_tensor = torch.tensor(X, dtype=torch.float32)
+y_train_tensor = torch.tensor(y, dtype=torch.float32)
+
+best_params, best_accuracy = optimize_hyperparameters(X_train_tensor, y_train_tensor)
+
+print("\nBest Hyperparameters:")
+print(f"Learning Rate: {best_params['learning_rate']}")
+print(f"Momentum: {best_params['momentum']}")
+print(f"Activation Function: {best_params['activation_function']}")
+print(f"Best Accuracy: {best_accuracy:.4f}")

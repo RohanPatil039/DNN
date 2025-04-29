@@ -1,0 +1,103 @@
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader, TensorDataset
+from sklearn.datasets import make_regression
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import mean_squared_error
+import numpy as np
+
+# 1. Generate and prepare the dataset
+X, y = make_regression(n_samples=1000, n_features=10, noise=0.1, random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+X_scaler = StandardScaler(); X_train_scaled = X_scaler.fit_transform(X_train); X_test_scaled = X_scaler.transform(X_test)
+y_scaler = StandardScaler(); y_train_scaled = y_scaler.fit_transform(y_train.reshape(-1, 1)); y_test_scaled = y_scaler.transform(y_test.reshape(-1, 1))
+X_train_tensor = torch.tensor(X_train_scaled, dtype=torch.float32)
+X_test_tensor = torch.tensor(X_test_scaled, dtype=torch.float32)
+y_train_tensor = torch.tensor(y_train_scaled, dtype=torch.float32)
+y_test_tensor = torch.tensor(y_test_scaled, dtype=torch.float32)
+train_loader = DataLoader(TensorDataset(X_train_tensor, y_train_tensor), batch_size=32, shuffle=True)
+test_loader = DataLoader(TensorDataset(X_test_tensor, y_test_tensor), batch_size=32)
+
+# 2. Define the neural network model
+class SimpleNN(nn.Module):
+    def __init__(self, input_size, hidden_units, activation):
+        super().__init__()
+        self.fc1 = nn.Linear(input_size, hidden_units)
+        self.act = activation
+        self.fc2 = nn.Linear(hidden_units, 1)
+
+    def forward(self, x):
+        return self.fc2(self.act(self.fc1(x)))
+
+# 3. Define the hyperparameter grid
+param_grid = {
+    'learning_rate': [0.001, 0.01, 0.1],
+    'hidden_units': [10, 20], # Reduced for brevity
+    'activation': [nn.ReLU(), nn.Tanh()],
+    'optimizer': ['Adam', 'SGD']
+}
+
+# 4. Perform grid search
+best_mse = float('inf')
+best_params = None
+
+learning_rates = param_grid['learning_rate']
+hidden_units_list = param_grid['hidden_units']
+activations = param_grid['activation']
+optimizers = param_grid['optimizer']
+
+for lr in learning_rates:
+    for hidden_units in hidden_units_list:
+        for activation in activations:
+            for optimizer_type in optimizers:
+                params = {
+                    'learning_rate': lr,
+                    'hidden_units': hidden_units,
+                    'activation': activation,
+                    'optimizer': optimizer_type
+                }
+
+
+                # Instantiate the model
+                model = SimpleNN(X_train_tensor.shape[1], params['hidden_units'], params['activation'])
+
+                # Instantiate the optimizer
+                if params['optimizer'] == 'Adam':
+                    optimizer = optim.Adam(model.parameters(), lr=params['learning_rate'])
+                elif params['optimizer'] == 'SGD':
+                    optimizer = optim.SGD(model.parameters(), lr=params['learning_rate'])
+                else:
+                    raise ValueError(f"Unknown optimizer: {params['optimizer']}")
+
+                criterion = nn.MSELoss()
+                epochs = 3 # Reduced for brevity
+
+                # Train the model
+                model.train()
+                for epoch in range(epochs):
+                    for inputs, targets in train_loader:
+                        optimizer.zero_grad()
+                        outputs = model(inputs)
+                        loss = criterion(outputs, targets)
+                        loss.backward()
+                        optimizer.step()
+
+
+                # Evaluate the model
+                model.eval()
+                with torch.no_grad():
+                    test_outputs = model(X_test_tensor)
+                    mse = criterion(test_outputs, y_test_tensor).item()
+
+
+                # Update best results
+                if mse < best_mse:
+                    best_mse = mse
+                    best_params = params
+
+# 5. Print the best hyperparameters and results
+print("\nBest Hyperparameters:")
+print(best_params)
+print(f"Best Test MSE: {best_mse:.4f}")

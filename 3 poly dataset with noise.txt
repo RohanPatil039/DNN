@@ -1,0 +1,54 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Function to fit polynomial with noise
+def polynomial_curve_fitting(x, y, poly_degree, noise_std):
+    noise = np.random.normal(0, noise_std, len(y))
+    y_noise = y + noise
+    coeff = np.polyfit(x, y_noise, poly_degree)
+    poly = np.poly1d(coeff)
+    return poly, y_noise
+
+# Function to make plots
+def make_plots(x, y_noise, poly):
+    plt.scatter(x, y_noise)
+    plt.title('Noisy Data Points')
+    plt.grid()
+    plt.show()
+
+    plt.scatter(x, y_noise)
+    x_line = np.linspace(min(x), max(x), 100)
+    plt.plot(x_line, poly(x_line), color='r')
+    plt.title('Polynomial Fit')
+    plt.grid()
+    plt.show()
+
+# Function to make prediction
+def make_prediction(x_new, poly):
+    predicted_val = poly(x_new)
+    return predicted_val
+
+# --- Main Code ---
+# Load dataset
+df = sns.load_dataset('tips')
+print(df.head())
+
+# Features
+x = df['total_bill']
+y = df['tip']
+
+# Polynomial fitting
+poly, y_noise = polynomial_curve_fitting(x, y, poly_degree=5, noise_std=3)
+
+# Print actual vs noise-added values
+for actual, noise in zip(y, y_noise):
+    print(f'Actual Value: {actual:.2f} and Value with noise: {noise:.2f}')
+
+# Plotting
+make_plots(x, y_noise, poly)
+
+# Prediction for a new value
+x_new = 10
+print(f"Predicted tip for a total bill of {x_new}: {make_prediction(x_new, poly):.2f}")
